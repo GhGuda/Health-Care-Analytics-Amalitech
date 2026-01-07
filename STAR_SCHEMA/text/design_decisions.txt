@@ -1,0 +1,154 @@
+Decision 1: Fact Table Grain
+
+Chosen Option:
+# Option A – One row per encounter
+
+Rationale:
+The fact table uses one row per encounter because all required metrics—visits,
+patients, readmissions, and revenue—are encounter-based, and finer grains would 
+cause data duplication and incorrect aggregations.
+
+
+
+Decision 2: Dimension Tables
+
+To support analytical queries while keeping the fact table compact, the following
+dimension tables will be created:
+
+Date Dimension (dim_date)
+
+Purpose:
+Enables grouping and filtering by time (month, year, etc.) without recalculating dates at query time.
+
+Attributes:
+    date_key (surrogate key)
+    full_date
+    day
+    month
+    month_name
+    quarter
+    year
+    day_of_week
+
+
+
+
+Patient Dimension (dim_patient)
+
+Purpose:
+Stores descriptive patient information for analysis
+without duplicating data in the fact table.
+
+Attributes:
+    patient_key (surrogate key)
+    mrn
+    gender
+    date_of_birth
+    age_group (optional, derived)
+
+
+
+Provider Dimension (dim_provider)
+
+Purpose:
+Describes the healthcare provider responsible for an encounter.
+
+Attributes:
+    provider_key (surrogate key)
+    first_name
+    last_name
+    credential
+    specialty_key
+    department_key
+
+
+
+Department Dimension (dim_department)
+
+Purpose:
+Describes where care was delivered within the facility.
+
+Attributes:
+    department_key (surrogate key)
+    department_name
+    floor
+    capacity
+
+
+
+Encounter Type Dimension (dim_encounter_type)
+
+Purpose:
+Standardizes encounter types and avoids repeating text values in the fact table.
+
+Attributes:
+    encounter_type_key (surrogate key)
+    encounter_type_name
+
+
+
+
+Diagnosis Dimension (dim_diagnosis)
+
+Purpose:
+Stores diagnosis descriptions and codes for analytical reporting.
+
+Attributes:
+    diagnosis_key (surrogate key)
+    icd10_code
+    icd10_description
+
+
+
+Procedure Dimension (dim_procedure)
+
+Purpose:
+Stores procedure details for analytical reporting.
+
+Attributes:
+    procedure_key (surrogate key)
+    cpt_code
+    cpt_description
+
+
+
+Decision 3: Pre-Aggregated Metrics
+
+To improve analytical query performance, the following metrics are stored 
+directly in the fact table and pre-computed during the ETL process:
+
+encounter_count – Always set to 1 to enable fast counting of encounters.
+
+diagnosis_count – The number of diagnoses associated with each encounter.
+
+procedure_count – The number of procedures performed during each encounter.
+
+total_allowed_amount – The total approved billing amount per encounter.
+
+length_of_stay – The duration between encounter admission and discharge.
+
+Rationale:
+Pre-aggregating these metrics eliminates the need for expensive runtime 
+joins to diagnosis, procedure, and billing tables, as well as repeated 
+aggregation and GROUP BY operations. This significantly reduces query 
+complexity, avoids row explosion from many-to-many relationships, and 
+allows analytical queries to execute faster and scale efficiently as 
+data volume increases.
+
+
+
+Decision 4: Bridge Tables
+
+Decision:
+Yes, bridge tables will be used to model many-to-many relationships between encounters 
+and diagnoses, and between encounters and procedures.
+
+Rationale:
+An encounter can be associated with multiple diagnoses and multiple procedures, while 
+each diagnosis and procedure can appear in many encounters. Using bridge tables 
+(bridge_encounter_diagnosis and bridge_encounter_procedure) preserves the fact 
+table grain of one row per encounter and prevents row duplication. 
+This approach avoids inflated encounter counts, duplicated revenue, and incorrect 
+readmission calculations. Bridge tables allow detailed clinical analysis while keeping 
+the fact table compact, accurate, and performant.
+
