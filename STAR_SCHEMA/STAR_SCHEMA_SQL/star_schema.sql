@@ -1,3 +1,4 @@
+CREATE DATABASE IF NOT EXISTS healthcare_star;
 /* =========================================================
    DIMENSION TABLES
    ========================================================= */
@@ -8,7 +9,7 @@
    --------------------------------------------------------- */
    
 -- 1. Date Dimension
-CREATE TABLE dim_date (
+CREATE TABLE healthcare_star.dim_date (
     date_key INT PRIMARY KEY,
     calendar_date DATE NOT NULL,
     day INT,
@@ -26,7 +27,7 @@ CREATE TABLE dim_date (
    --------------------------------------------------------- */
 
 -- 2. Patient Dimension
-CREATE TABLE dim_patient (
+CREATE TABLE healthcare_star.dim_patient (
     patient_key INT AUTO_INCREMENT PRIMARY KEY,
     patient_id INT,
     mrn VARCHAR(20),
@@ -44,7 +45,7 @@ CREATE TABLE dim_patient (
    --------------------------------------------------------- */
 
 -- 3. Speciality Dimension
-CREATE TABLE dim_specialty (
+CREATE TABLE healthcare_star.dim_specialty (
     specialty_key INT AUTO_INCREMENT PRIMARY KEY,
     specialty_id INT,
     specialty_name VARCHAR(100),
@@ -58,7 +59,7 @@ CREATE TABLE dim_specialty (
    --------------------------------------------------------- */
 
 -- 4. Department Dimension
-CREATE TABLE dim_department (
+CREATE TABLE healthcare_star.dim_department (
     department_key INT AUTO_INCREMENT PRIMARY KEY,
     department_id INT,
     department_name VARCHAR(100),
@@ -73,7 +74,7 @@ CREATE TABLE dim_department (
    --------------------------------------------------------- */
 
 -- 5. Providers Dimension
-CREATE TABLE dim_provider (
+CREATE TABLE healthcare_star.dim_provider (
     provider_key INT AUTO_INCREMENT PRIMARY KEY,
     provider_id INT,
     first_name VARCHAR(100),
@@ -81,8 +82,8 @@ CREATE TABLE dim_provider (
     credential VARCHAR(20),
     specialty_key INT,
     department_key INT,
-    FOREIGN KEY (specialty_key) REFERENCES dim_specialty(specialty_key),
-    FOREIGN KEY (department_key) REFERENCES dim_department(department_key)
+    FOREIGN KEY (specialty_key) REFERENCES healthcare_star.dim_specialty(specialty_key),
+    FOREIGN KEY (department_key) REFERENCES healthcare_star.dim_department(department_key)
 );
 
 
@@ -92,7 +93,7 @@ CREATE TABLE dim_provider (
    --------------------------------------------------------- */
 
 -- 6. Encounter Type Dimension
-CREATE TABLE dim_encounter_type (
+CREATE TABLE healthcare_star.dim_encounter_type (
     encounter_type_key INT AUTO_INCREMENT PRIMARY KEY,
     encounter_type_name VARCHAR(50)
 );
@@ -104,7 +105,7 @@ CREATE TABLE dim_encounter_type (
    --------------------------------------------------------- */
 
 -- 7. Diagnosis Dimension
-CREATE TABLE dim_diagnosis (
+CREATE TABLE healthcare_star.dim_diagnosis (
     diagnosis_key INT AUTO_INCREMENT PRIMARY KEY,
     diagnosis_id INT,
     icd10_code VARCHAR(10),
@@ -117,7 +118,7 @@ CREATE TABLE dim_diagnosis (
    --------------------------------------------------------- */
 
 -- 8. Procedure Dimension
-CREATE TABLE dim_procedure (
+CREATE TABLE healthcare_star.dim_procedure (
     procedure_key INT AUTO_INCREMENT PRIMARY KEY,
     procedure_id INT,
     cpt_code VARCHAR(10),
@@ -137,7 +138,7 @@ CREATE TABLE dim_procedure (
    --------------------------------------------------------- */
 
 -- DDL: Fact Table
-CREATE TABLE fact_encounters (
+CREATE TABLE healthcare_star.fact_encounters (
     encounter_key INT AUTO_INCREMENT PRIMARY KEY,
     date_key INT NOT NULL,
     patient_key INT NOT NULL,
@@ -151,12 +152,12 @@ CREATE TABLE fact_encounters (
     total_allowed_amount DECIMAL(12,2),
     length_of_stay INT,
     encounter_id INT,
-    FOREIGN KEY (date_key) REFERENCES dim_date(date_key),
-    FOREIGN KEY (patient_key) REFERENCES dim_patient(patient_key),
-    FOREIGN KEY (provider_key) REFERENCES dim_provider(provider_key),
-    FOREIGN KEY (specialty_key) REFERENCES dim_specialty(specialty_key),
-    FOREIGN KEY (department_key) REFERENCES dim_department(department_key),
-    FOREIGN KEY (encounter_type_key) REFERENCES dim_encounter_type(encounter_type_key),
+    FOREIGN KEY (date_key) REFERENCES healthcare_star.dim_date(date_key),
+    FOREIGN KEY (patient_key) REFERENCES healthcare_star.dim_patient(patient_key),
+    FOREIGN KEY (provider_key) REFERENCES healthcare_star.dim_provider(provider_key),
+    FOREIGN KEY (specialty_key) REFERENCES healthcare_star.dim_specialty(specialty_key),
+    FOREIGN KEY (department_key) REFERENCES healthcare_star.dim_department(department_key),
+    FOREIGN KEY (encounter_type_key) REFERENCES healthcare_star.dim_encounter_type(encounter_type_key),
     INDEX idx_date_key (date_key),
     INDEX idx_patient_key (patient_key),
     INDEX idx_provider_key (provider_key),
@@ -178,13 +179,13 @@ CREATE TABLE fact_encounters (
    --------------------------------------------------------- */
 
 -- DDL: bridge_encounter_diagnoses
-CREATE TABLE bridge_encounter_diagnoses (
+CREATE TABLE healthcare_star.bridge_encounter_diagnoses (
     encounter_key INT NOT NULL,
     diagnosis_key INT NOT NULL,
     diagnosis_sequence INT,
     PRIMARY KEY (encounter_key, diagnosis_key),
-    FOREIGN KEY (encounter_key) REFERENCES fact_encounters(encounter_key),
-    FOREIGN KEY (diagnosis_key) REFERENCES dim_diagnosis(diagnosis_key),
+    FOREIGN KEY (encounter_key) REFERENCES healthcare_star.fact_encounters(encounter_key),
+    FOREIGN KEY (diagnosis_key) REFERENCES healthcare_star.dim_diagnosis(diagnosis_key),
     INDEX idx_bed_encounter (encounter_key),
     INDEX idx_bed_diagnosis (diagnosis_key)
 );
@@ -196,13 +197,17 @@ CREATE TABLE bridge_encounter_diagnoses (
             encounters and procedures
    --------------------------------------------------------- */
 -- DDL: bridge_encounter_procedures
-CREATE TABLE bridge_encounter_procedures (
+CREATE TABLE healthcare_star.bridge_encounter_procedures (
     encounter_key INT NOT NULL,
     procedure_key INT NOT NULL,
     procedure_date DATE,
     PRIMARY KEY (encounter_key, procedure_key),
-    FOREIGN KEY (encounter_key) REFERENCES fact_encounters(encounter_key),
-    FOREIGN KEY (procedure_key) REFERENCES dim_procedure(procedure_key),
+    FOREIGN KEY (encounter_key) REFERENCES healthcare_star.fact_encounters(encounter_key),
+    FOREIGN KEY (procedure_key) REFERENCES healthcare_star.dim_procedure(procedure_key),
     INDEX idx_bep_encounter (encounter_key),
     INDEX idx_bep_procedure (procedure_key)
 );
+
+/* =========================================================
+   END OF STAR SCHEMA DEFINITION
+   ========================================================= */

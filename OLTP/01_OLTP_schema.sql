@@ -1,6 +1,8 @@
-USE healthcareanalytic;
+-- Active: 1766589376562@@127.0.0.1@3306@healthcare_oltp
+CREATE DATABASE IF NOT EXISTS healthcare_oltp;
 
-CREATE TABLE patients (
+
+CREATE TABLE healthcare_oltp.patients (
   patient_id INT PRIMARY KEY,
   first_name VARCHAR (100),
   last_name VARCHAR (100),
@@ -10,14 +12,14 @@ CREATE TABLE patients (
 );
 
 
-CREATE TABLE specialties (
+CREATE TABLE healthcare_oltp.specialties (
   specialty_id INT PRIMARY KEY,
   specialty_name VARCHAR(100),
   specialty_code VARCHAR (10)
 );
 
 
-CREATE TABLE departments (
+CREATE TABLE healthcare_oltp.departments (
   department_id INT PRIMARY KEY,
   department_name VARCHAR(100),
   floor INT,
@@ -25,7 +27,7 @@ CREATE TABLE departments (
 );
 
 
-CREATE TABLE providers (
+CREATE TABLE healthcare_oltp.providers (
   provider_id INT PRIMARY KEY,
   first_name VARCHAR (100),
   last_name VARCHAR (100),
@@ -38,7 +40,7 @@ CREATE TABLE providers (
 
 
 
-CREATE TABLE encounters (
+CREATE TABLE healthcare_oltp.encounters (
   encounter_id INT PRIMARY KEY,
   patient_id INT,
   provider_id INT,
@@ -54,7 +56,7 @@ CREATE TABLE encounters (
 
 
 
-CREATE TABLE diagnoses (
+CREATE TABLE healthcare_oltp.diagnoses (
   diagnosis_id INT PRIMARY KEY,
   icd10_code VARCHAR(10),
   icd10_description VARCHAR(200)
@@ -62,7 +64,7 @@ CREATE TABLE diagnoses (
 
 
 
-CREATE TABLE encounter_diagnoses (
+CREATE TABLE healthcare_oltp.encounter_diagnoses (
   encounter_diagnosis_id INT PRIMARY KEY,
   encounter_id INT,
   diagnosis_id INT,
@@ -73,7 +75,7 @@ CREATE TABLE encounter_diagnoses (
 
 
 
-CREATE TABLE procedures (
+CREATE TABLE healthcare_oltp.procedures (
   procedure_id INT PRIMARY KEY,
   cpt_code VARCHAR (10),
   cpt_description VARCHAR (200)
@@ -81,7 +83,7 @@ CREATE TABLE procedures (
 
 
 
-CREATE TABLE encounter_procedures (
+CREATE TABLE healthcare_oltp.encounter_procedures (
   encounter_procedure_id INT PRIMARY KEY,
   encounter_id INT,
   procedure_id INT,
@@ -92,7 +94,7 @@ CREATE TABLE encounter_procedures (
 
 
 
-CREATE TABLE billing (
+CREATE TABLE healthcare_oltp.billing (
   billing_id INT PRIMARY KEY,
   encounter_id INT,
   claim_amount DECIMAL (12, 2),

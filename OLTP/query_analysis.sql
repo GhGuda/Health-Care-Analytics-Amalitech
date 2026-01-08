@@ -1,9 +1,11 @@
 
-USE healthcareanalytic;
+CREATE DATABASE IF NOT EXISTS healthcare_oltp;
+USE healthcare_oltp;
 
 -- Question 1: Monthly Encounters by Specialty
 
 -- a. SQL query
+EXPLAIN ANALYZE
 SELECT
         s.specialty_name,
         e.encounter_type,
