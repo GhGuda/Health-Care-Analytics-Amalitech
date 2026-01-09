@@ -1,5 +1,6 @@
--- Active: 1766589376562@@127.0.0.1@3306@healthcare_oltp
+-- Active: 1767604759232@@127.0.0.1@3306@healthcare_oltp
 CREATE DATABASE IF NOT EXISTS healthcare_oltp;
+
 
 
 CREATE TABLE healthcare_oltp.patients (

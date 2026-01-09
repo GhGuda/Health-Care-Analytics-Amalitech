@@ -1,0 +1,94 @@
+ETL Design Overview
+
+1) Dimension Load Logic
+
+Q: How do you populate dim_patient from the patients table?
+- Extract: SELECT * FROM healthcare_oltp.patients (staging_patients).
+- Deduplicate by natural key patient_id.
+- Resolve surrogate patient_key (sequence or identity).
+- Derive attributes (age, age_group, full_name, sex_code).
+- Upsert into dim_patient using natural key (patient_id):
+    - If exists → UPDATE (SCD Type 1).
+    - If not → INSERT with new patient_key.
+- Pseudocode:
+    INSERT INTO dim_patient (...)
+    SELECT ... FROM staging_patients
+    ON DUPLICATE KEY UPDATE ...;
+
+Q: How do you populate dim_date (one-time load)?
+- Determine date range: MIN(encounter_date) .. MAX(encounter_date) from healthcare_oltp.encounters or fixed calendar window.
+- For each calendar date generate one row with:
+    date_key (YYYYMMDD),
+    date, year, month, quarter, day_of_week, is_weekend, is_holiday_flag.
+- Load once; maintain if calendar extends.
+
+Q: How do you handle updates to dimensions?
+- Use SCD Type 1 (overwrite).
+- Use staging + merge/upsert keyed on natural key (patient_id, provider_id, etc.).
+- Log changes (audit table) if needed for debugging/backfill.
+
+2) Fact Table Load Logic
+
+Q: For each encounter, how do you look up dimension keys?
+- Stage encounters from healthcare_oltp.encounters.
+- Join staging_encounters to dimension tables by natural keys:
+    - patient_id → dim_patient.patient_id → patient_key
+    - encounter_date → dim_date.date → date_key
+    - provider_id → dim_provider.provider_id → provider_key
+    - specialty via provider → specialty_key
+- Pseudocode:
+    SELECT e.*, dp.patient_key, dd.date_key, dpv.provider_key
+    FROM staging_encounters e
+    LEFT JOIN dim_patient dp ON e.patient_id = dp.patient_id
+    LEFT JOIN dim_date dd ON DATE(e.encounter_date) = dd.date
+    ...
+    INSERT INTO fact_encounters(...keys..., metrics...)
+
+Q: How do you calculate pre-aggregated metrics?
+- Per encounter compute:
+    - diagnosis_count: COUNT(distinct diagnosis_id)
+    - procedure_count: COUNT(distinct procedure_id)
+    - total_allowed_amount: SUM(b.allowed_amount)
+    - length_of_stay: DATEDIFF(discharge_date, encounter_date)
+- Compute via grouped queries against encounter_diagnoses, encounter_procedures, billing; LEFT JOIN results into fact load.
+- Store metrics as columns on fact_encounters.
+
+Q: How do you handle missing data?
+- Use LEFT JOINs from encounters to lookup/tables.
+- Default numeric metrics to 0 (COALESCE(...,0)).
+- Allow nullable fields for optional measures (billing).
+- Flag missing FK resolutions in audit for later investigation.
+
+3) Bridge Table Load Logic
+
+Q: How do you populate bridge_encounter_diagnoses?
+- Join healthcare_oltp.encounter_diagnoses to fact_encounters by encounter_id.
+- Resolve diagnosis_key from dim_diagnosis using diagnosis_id.
+- Group by (fact_encounter_key, diagnosis_key) to remove duplicates.
+- Insert one row per unique encounter–diagnosis with sequence/role metadata.
+
+Q: How do you populate bridge_encounter_procedures?
+- Same approach as diagnoses:
+    - Join encounter_procedures → fact_encounters → dim_procedure.
+    - De-duplicate and insert (fact_encounter_key, procedure_key, procedure_date).
+
+4) Refresh Strategy
+
+Q: How often would you load?
+- Dimensions: infrequent (on change or daily delta).
+- dim_date: one-time, extend if needed.
+- Fact table: daily incremental (process new/changed encounters since last watermark).
+- Bridge tables: incremental when fact rows change; full refresh optional for lab.
+
+Q: How would you handle late-arriving facts?
+- Detect by comparing encounter_date < last_watermark.
+- For late arrivals:
+    - Stage and upsert affected fact rows.
+    - Recompute dependent aggregates and bridge rows for impacted dates/keys.
+    - Mark backfilled periods and emit audit entries.
+- For severe inconsistencies, provide a targeted rebuild of fact partitions or full refresh of affected bridges.
+
+Operational notes (concise)
+- Use transactional loads: staging → validation → swap/merge.
+- Maintain watermarks (last_loaded_timestamp) and audit logs.
+- Use batching and indexes on natural keys to speed lookups.
