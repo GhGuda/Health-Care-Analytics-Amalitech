@@ -28,13 +28,16 @@ Star schema: Joins fact table directly to small dimension tables
 - Need to maintain multiple schemas (OLTP + Star)
 
 ## What did you gain?
-- Faster analytical queries  
-- Simpler, more readable SQL  
-- Pre-aggregated metrics  
-- Scalable analytical design
+- Clear separation of transactional and analytical workloads
+
+- Simpler and more readable analytical SQL
+
+- Consistent aggregation grain
+
+- Scalable query patterns suitable for BI and reporting tools
 
 ## Was it worth it?
-Yes — especially for analytical workloads. Performance gains increase as data volume grows. Improved clarity and maintainability outweigh ETL cost.
+Yes. Even when performance gains are modest at small scale, the star schema provides clarity, maintainability, and predictable scaling behavior. These benefits outweigh the added ETL complexity for analytical systems.
 
 # Bridge Tables: Worth It?
 
@@ -53,18 +56,22 @@ No — bridge tables are standard for many-to-many relationships. Alternative wo
 # Performance Quantification
 
 ## Example 1: Monthly Encounters by Specialty
-- Original execution time: OLTP execution time: ~0.47 seconds  
-- Optimized execution time: Star schema execution time: ~0.02 milliseconds  
-- Improvement: ~23,000× faster  
-- Main reason for the speedup: Precomputed date attributes and reduced join complexity
+- Original execution time: OLTP execution time: ~0.37–0.49 seconds
+
+- Star schema execution time: ~0.65–0.76 seconds
+
+- Observed result: OLTP faster at small scale
+
+- Explanation: Warm cache and small dataset favor OLTP, but star schema shows cleaner execution and better scalability
+
 
 ## Example 2: Diagnosis–Procedure Pairs
-- Original execution time: OLTP execution time: ~1.89 seconds  
-- Optimized execution time: Star schema execution time: ~0.75 milliseconds  
-- Improvement: ~2,500× faster  
-- Main reason for the speedup: Pre-resolved many-to-many relationships using bridge tables
+- Original execution time: OLTP execution time: ~2.8 seconds
+
+- Star schema execution time: ~1.9 seconds
+
+- Observed improvement: ~1.5× faster
+
+- Main reason: Pre-modeled many-to-many relationships using bridge tables reduced join complexity
 
 
-
-<!-- NOTE: -->
-This project uses two separate databases: one for OLTP operations (healthcare_oltp) and one for analytical processing (healthcare_star). This separation mirrors real-world data architecture, where transactional systems are isolated from analytical workloads to avoid performance interference.”
