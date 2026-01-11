@@ -26,22 +26,17 @@ ORDER BY
 
 
 -- Execution Time Estimate
-    -- Star schema: ~ 0.02 ms
-    -- OLTP equivalent: ~ 470 ms
-
--- Change:
-    --  ~470 ms → ~0.02 ms
+    -- Star schema: ~0.65–0.76 seconds
+    -- OLTP equivalent: ~0.37–0.49 seconds
 
 -- Improvement Factor
-    -- ~23,000× faster (lab-scale, cache-assisted)
+    --~0.6× faster (OLTP faster in this lab-scale test)
 
 -- Note: This improvement factor is exaggerated by the small dataset 
 -- and warm cache, but still valid for demonstrating architectural efficiency.
 
 -- Why Is It Faster?
--- The star schema query executes significantly faster because encounter metrics and date attributes are 
--- precomputed and stored at a consistent grain, eliminating runtime calculations and complex OLTP joins.
-
+-- Even though the star schema query executed slightly slower in this lab run, it demonstrates superior analytical design.
 
 
 -- Question 2: Top Diagnosis-Procedure Pairs
@@ -70,14 +65,11 @@ LIMIT 10;
 
 
 -- Execution Time Estimate
-    -- Star schema: ~ 0.75 ms
-    -- OLTP equivalent: ~ 1.89 s
-
--- Change:
-    -- ~1.89 s → ~0.00075 s
+    -- Star schema: ~ 1.9s
+    -- OLTP equivalent: ~ 2.8 s
 
 -- Improvement Factor
-    -- ~2,500× faster (lab-scale, cache-assisted)
+    -- ~1.5× faster (lab-scale, cache-assisted)
 
 -- Note: As before, the factor is inflated by small data size and caching, 
 -- but the direction and reasoning are correct.
@@ -109,23 +101,16 @@ LEFT JOIN healthcare_star.fact_encounters fe2
 
 
 -- Execution Time Estimate
-    -- Star schema: ~ 0.04 ms
-    -- OLTP equivalent: ~ 1.33 s
-
--- Change:
-    -- ~1.33 s → ~0.00004 s
+    -- Star schema: ~ 4.2s
+    -- OLTP equivalent: ~ 1.85s
 
 -- Improvement Factor
-    -- ~33,000× faster (lab-scale, cache-assisted)
-
--- Note: As with earlier queries, this factor is inflated by small
---  data volume and caching, but the relative efficiency and reasoning are correct.
+    -- ~0.4× (OLTP faster in this lab-scale test)
 
 -- Why Is It Faster?
-    -- The star schema enables efficient readmission analysis by using 
-    -- a fact-table self-join with integer date keys, eliminating expensive 
-    -- OLTP self-joins and runtime date calculations.
-
+-- The star schema is slower here because the 30-day 
+-- readmission logic requires a self-join on the fact 
+-- table, creating many comparisons at this data scale.
 
 
 -- Question 4: Revenue by Specialty & Month
@@ -154,17 +139,11 @@ ORDER BY
 
 
 -- Execution Time Estimate
-    -- Star schema: ~ 0.08 ms
-    -- OLTP equivalent: ~ 1.08 s
-
--- Change:
-    -- ~1.08 s → ~0.00008 s
+    -- Star schema: ~ 0.55 seconds
+    -- OLTP equivalent: ~ 0.75 s
 
 -- Improvement Factor
-    -- ~13,500× faster (lab-scale, cache-assisted)
-
--- Note: As with the other star queries, this factor is inflated by 
--- small data size and warm cache, but it correctly demonstrates the architectural advantage.
+    -- ~1.4× faster (lab-scale, cache-assisted)
 
 -- Why Is It Faster?
     -- The star schema query is faster because revenue data is pre-aggregated 

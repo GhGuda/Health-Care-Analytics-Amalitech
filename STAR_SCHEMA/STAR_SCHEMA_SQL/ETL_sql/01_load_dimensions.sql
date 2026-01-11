@@ -1,5 +1,4 @@
 -- Load dim_date (Generated, not from OLTP)
-
 INSERT INTO healthcare_star.dim_date (
     date_key,
     calendar_date,
@@ -135,6 +134,18 @@ SELECT * FROM healthcare_star.dim_diagnosis ORDER BY diagnosis_id;
 
 
 -- Load dim_procedure
+
+INSERT INTO healthcare_star.dim_procedure (
+    procedure_id,
+    cpt_code,
+    cpt_description
+)
+SELECT
+    procedure_id,
+    cpt_code,
+    cpt_description
+FROM healthcare_oltp.procedures;
+SELECT * FROM healthcare_star.dim_procedure ORDER BY procedure_id;
 
 
 /* =========================================================

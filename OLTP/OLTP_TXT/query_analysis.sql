@@ -2,6 +2,7 @@
 -- Question 1: Monthly Encounters by Specialty
 
 -- a. SQL query
+EXPLAIN ANALYZE
 SELECT
         s.specialty_name,
         e.encounter_type,
@@ -40,14 +41,9 @@ SELECT
 -- Performance:
 
 -- Execution time:
-    -- ~0.47 seconds(470ms)
+    -- ~0.37 seconds - 0.49 seconds
 
--- Estimated rows scanned:
-    -- healthcare_oltp.encounters: ~ 100,000 rows
-
-    -- healthcare_oltp.providers: 3 rows
-
-    -- healthcare_oltp.specialties: 3 rows
+-- Estimated rows scanned: ~ 100,000 rows
 
 -- Bottleneck Identified
     -- Primary bottleneck:
@@ -93,13 +89,9 @@ SELECT
 
 -- Performance:
     -- Execution time:
-        -- ~ 1.89 seconds
+        -- ~ 2.8 seconds
 
-    -- Estimated rows scanned:
-        -- healthcare_oltp.encounter_procedures: ~ 133,000 rows
-        -- healthcare_oltp.encounter_diagnoses: ~ 330,000 rows
-        -- healthcare_oltp.procedures: indexed single-row lookups (~133k)
-        -- healthcare_oltp.diagnoses: indexed single-row lookups (~333k)
+    -- Estimated rows scanned: ~333,000 rows
 
 -- Bottleneck Identified:
     -- Primary bottleneck:
@@ -140,13 +132,9 @@ ORDER BY readmission_count DESC;
 
 -- Performance:
     -- Execution time:
-        -- ~ 1.33 seconds
+        -- ~ 1.85 seconds
 
-    -- Estimated rows scanned:
-        -- healthcare_oltp.encounters (e1): ~ 100,000 rows
-        -- healthcare_oltp.encounters (e2): ~ 330,000 indexed lookups
-        -- healthcare_oltp.providers: ~ 33,000 single-row lookups
-        -- healthcare_oltp.specialties: 3 rows
+    -- Estimated rows scanned: ~ 104,000 rows
 
 -- Bottleneck Identified:
     -- Primary bottleneck:
@@ -194,13 +182,9 @@ ORDER BY
 
 -- Performance:
     -- Execution time:
-        -- 1.08 seconds
+        -- 0.75 seconds
 
-    -- Estimated rows scanned:
-        -- healthcare_oltp.encounters: ~ 100,000 rows
-        -- healthcare_oltp.providers: 3 rows
-        -- healthcare_oltp.specialties: 3 rows
-        -- healthcare_oltp.billing: ~ 100,000 indexed lookups
+    -- Estimated rows scanned: ~ 100,000 rows
 
 -- Bottleneck Identified:
     -- Primary bottleneck:

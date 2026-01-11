@@ -65,6 +65,3 @@ No — bridge tables are standard for many-to-many relationships. Alternative wo
 - Main reason for the speedup: Pre-resolved many-to-many relationships using bridge tables
 
 
-
-<!-- NOTE: -->
-This project uses two separate databases: one for OLTP operations (healthcare_oltp) and one for analytical processing (healthcare_star). This separation mirrors real-world data architecture, where transactional systems are isolated from analytical workloads to avoid performance interference.”
