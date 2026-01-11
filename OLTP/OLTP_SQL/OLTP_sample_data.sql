@@ -12,6 +12,9 @@ CREATE PROCEDURE load_patients_5k()
 BEGIN
     DECLARE i INT DEFAULT 1;
     DECLARE next_patient_id INT;
+    DECLARE batch_counter INT DEFAULT 0;
+    DECLARE batch_size INT DEFAULT 1000;
+
 
     SELECT IFNULL(MAX(patient_id), 1000)
     INTO next_patient_id
@@ -38,14 +41,21 @@ BEGIN
         );
 
         SET i = i + 1;
+        SET batch_counter = batch_counter + 1;
+        -- BATCH COMMIT
+        IF batch_counter = batch_size THEN
+            COMMIT;
+            START TRANSACTION;
+            SET batch_counter = 0;
+        END IF;
     END WHILE;
+    -- commit remaining rows
+    COMMIT;
 END$$
 
 DELIMITER ;
 
 CALL load_patients_5k();
-
-SELECT * FROM healthcare_oltp.patients;
 
 
 INSERT INTO healthcare_oltp.specialties VALUES 
@@ -143,13 +153,6 @@ END$$
 DELIMITER ;
 
 CALL load_encounters_100k();
-
-SELECT COUNT(*) FROM healthcare_oltp.encounters;
-
-SELECT * FROM healthcare_oltp.encounters;
-
-SELECT MIN(encounter_id), MAX(encounter_id) FROM encounters;
-
 
 
 
@@ -258,12 +261,9 @@ BEGIN
     -- commit remaining rows
     COMMIT;
 END$$
-
 DELIMITER ;
 
 CALL load_encounter_diagnoses();
-SELECT COUNT(*) FROM encounter_diagnoses;
-
 
 
 
@@ -280,7 +280,6 @@ INSERT INTO healthcare_oltp.encounter_procedures VALUES
 (9004, 7003, 4001, '2024-05-15');
 
 -- Insert ~1-2 per encounter procedures using a stored procedure
-
 DELIMITER $$
 
 CREATE PROCEDURE load_encounter_procedures()
@@ -375,9 +374,6 @@ DELIMITER ;
 
 CALL load_encounter_procedures();
 
-SELECT COUNT(*) FROM encounter_procedures;
-SELECT * FROM encounter_procedures;
-
 
 
 INSERT INTO healthcare_oltp.billing VALUES 
@@ -458,7 +454,4 @@ END$$
 
 DELIMITER ;
 
-
 CALL load_billing_per_encounter();
-
-SELECT COUNT(*) FROM billing;
