@@ -1,8 +1,3 @@
-<<<<<<< Updated upstream
-=======
--- Active: 1766589376562@@127.0.0.1@3306@healthcare_star
-DROP DATABASE IF EXISTS healthcare_star;
->>>>>>> Stashed changes
 CREATE DATABASE IF NOT EXISTS healthcare_star;
 /* =========================================================
    DIMENSION TABLES
@@ -168,10 +163,6 @@ CREATE TABLE healthcare_star.fact_encounters (
     total_allowed_amount DECIMAL(12,2),
     length_of_stay INT,
     encounter_id INT,
-<<<<<<< Updated upstream
-=======
-
->>>>>>> Stashed changes
     FOREIGN KEY (date_key) REFERENCES healthcare_star.dim_date(date_key),
     FOREIGN KEY (patient_key) REFERENCES healthcare_star.dim_patient(patient_key),
     FOREIGN KEY (provider_key) REFERENCES healthcare_star.dim_provider(provider_key),
@@ -186,6 +177,10 @@ CREATE TABLE healthcare_star.fact_encounters (
     INDEX idx_department_key (department_key),
     INDEX idx_encounter_type_key (encounter_type_key)
 );
+
+ALTER TABLE healthcare_star.fact_encounters DROP COLUMN encounter_date;
+ALTER TABLE healthcare_star.fact_encounters DROP COLUMN discharge_date;
+
 
 <<<<<<< Updated upstream
 =======
@@ -208,12 +203,13 @@ CREATE TABLE healthcare_star.bridge_encounter_diagnoses (
     encounter_key INT NOT NULL,
     diagnosis_key INT NOT NULL,
     diagnosis_sequence INT,
-    PRIMARY KEY (encounter_key, diagnosis_key),
+    PRIMARY KEY (encounter_key, diagnosis_key, diagnosis_sequence),
     FOREIGN KEY (encounter_key) REFERENCES healthcare_star.fact_encounters(encounter_key),
     FOREIGN KEY (diagnosis_key) REFERENCES healthcare_star.dim_diagnosis(diagnosis_key),
     INDEX idx_bed_encounter (encounter_key),
     INDEX idx_bed_diagnosis (diagnosis_key)
 );
+
 
 
 /* ---------------------------------------------------------
@@ -236,3 +232,6 @@ CREATE TABLE healthcare_star.bridge_encounter_procedures (
 /* =========================================================
    END OF STAR SCHEMA DEFINITION
    ========================================================= */
+
+
+SHOW TABLES FROM healthcare_star;   

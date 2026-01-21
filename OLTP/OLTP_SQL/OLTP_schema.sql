@@ -1,4 +1,5 @@
--- Active: 1766589376562@@127.0.0.1@3306@healthcare_oltp
+-- Active: 1767604759232@@127.0.0.1@3306@healthcare_oltp
+DROP DATABASE IF EXISTS healthcare_oltp;
 CREATE DATABASE IF NOT EXISTS healthcare_oltp;
 
 
@@ -104,3 +105,4 @@ CREATE TABLE healthcare_oltp.billing (
   FOREIGN KEY (encounter_id) REFERENCES encounters (encounter_id),
   INDEX idx_claim_date (claim_date)
 );
+

@@ -1,26 +1,29 @@
-USE healthcare_oltp;
+-- Active: 1768089040947@@127.0.0.1@3306@healthcare_oltp
 
   
-INSERT INTO patients VALUES 
+INSERT INTO healthcare_oltp.patients VALUES 
 (1001, 'John', 'Doe','1955-03-15', 'M', 'MRN001'),
 (1002, 'Jane', 'Smith', '1962-07-22', 'F', 'MRN002'), 
 (1003, 'Robert', 'Johnson', '1948-11-08', 'M', 'MRN003');
 
--- Insert ~1,000 patients using a stored procedure
+-- Insert ~5,000 patients using a stored procedure
 DELIMITER $$
-CREATE PROCEDURE load_patients_1k()
+CREATE PROCEDURE load_patients_5k()
 BEGIN
     DECLARE i INT DEFAULT 1;
     DECLARE next_patient_id INT;
+    DECLARE batch_counter INT DEFAULT 0;
+    DECLARE batch_size INT DEFAULT 1000;
+
 
     SELECT IFNULL(MAX(patient_id), 1000)
     INTO next_patient_id
     FROM patients;
 
-    WHILE i <= 997 DO
+    WHILE i <= 4997 DO
         SET next_patient_id = next_patient_id + 1;
 
-        INSERT INTO patients (
+        INSERT INTO healthcare_oltp.patients (
             patient_id,
             first_name,
             last_name,
@@ -38,43 +41,54 @@ BEGIN
         );
 
         SET i = i + 1;
+        SET batch_counter = batch_counter + 1;
+        -- BATCH COMMIT
+        IF batch_counter = batch_size THEN
+            COMMIT;
+            START TRANSACTION;
+            SET batch_counter = 0;
+        END IF;
     END WHILE;
+    -- commit remaining rows
+    COMMIT;
 END$$
 
 DELIMITER ;
 
-CALL load_patients_1k();
+CALL load_patients_5k();
 
 
-INSERT INTO specialties VALUES 
+INSERT INTO healthcare_oltp.specialties VALUES 
 (1, 'Cardiology', 'CARD'), 
 (2, 'Internal Medicine', 'IM'), 
 (3, 'Emergency', 'ER');
 
 
-INSERT INTO departments VALUES 
+INSERT INTO healthcare_oltp.departments VALUES 
 (1, 'Cardiology Unit', 3, 20), 
 (2, 'Internal Medicine', 2, 30), 
 (3, 'Emergency', 1, 45);
 
-INSERT INTO providers VALUES 
+INSERT INTO healthcare_oltp.providers VALUES 
 (101, 'James', 'Chen', 'MD', 1, 1), 
 (102, 'Sarah', 'Williams', 'MD', 2, 2), 
 (103, 'Michael', 'Rodriguez', 'MD', 3, 3);
 
 
-INSERT INTO encounters VALUES
+INSERT INTO healthcare_oltp.encounters VALUES
 (7001, 1001, 101, 'Outpatient', '2024-05-10 10:00:00', '2024-05-10 11:30:00', 1),
 (7002, 1001, 101, 'Inpatient', '2024-06-02 14:00:00', '2024-06-06 09:00:00', 1),
 (7003, 1002, 102, 'Outpatient', '2024-05-15 09:00:00', '2024-05-15 10:15:00', 2),
 (7004, 1003, 103, 'ER', '2024-06-12 23:45:00', '2024-06-13 06:30:00', 3);
 
--- Insert ~10,000 encounters using a stored procedure
+-- Insert ~100,000 encounters using a stored procedure
 DELIMITER $$
-CREATE PROCEDURE load_encounters_10k()
+CREATE PROCEDURE load_encounters_100k()
 BEGIN
     DECLARE i INT DEFAULT 5;
     DECLARE next_encounter_id INT;
+    DECLARE batch_counter INT DEFAULT 0;
+    DECLARE batch_size INT DEFAULT 1000;
 
     -- get the current max encounter_id
     SELECT MAX(encounter_id) INTO next_encounter_id FROM encounters;
@@ -83,8 +97,10 @@ BEGIN
         SET next_encounter_id = 7000;
     END IF;
 
-    WHILE i <= 10000 DO
-        INSERT INTO encounters (
+
+    START TRANSACTION;
+    WHILE i <= 100000 DO
+        INSERT INTO healthcare_oltp.encounters (
             encounter_id,
             patient_id,
             provider_id,
@@ -121,20 +137,31 @@ BEGIN
 
         SET next_encounter_id = next_encounter_id + 1;
         SET i = i + 1;
+        SET batch_counter = batch_counter + 1;
+
+        -- BATCH COMMIT
+        IF batch_counter = batch_size THEN
+            COMMIT;
+            START TRANSACTION;
+            SET batch_counter = 0;
+        END IF;
+
     END WHILE;
+    -- commit remaining rows
+    COMMIT;
 END$$
 DELIMITER ;
 
-CALL load_encounters_10k();
+CALL load_encounters_100k();
 
 
 
-INSERT INTO diagnoses VALUES 
+INSERT INTO healthcare_oltp.diagnoses VALUES 
 (3001, 'I10', 'Hypertension'), 
 (3002, 'E11.9', 'Type 2 Diabetes'), 
 (3003, 'I50.9', 'Heart Failure');
 
-INSERT INTO encounter_diagnoses VALUES
+INSERT INTO healthcare_oltp.encounter_diagnoses VALUES
 (8001, 7001, 3001, 1),
 (8002, 7001, 3002, 2),
 (8003, 7002, 3001, 1),
@@ -154,6 +181,8 @@ BEGIN
     DECLARE i INT;
     DECLARE v_diagnosis_id INT;
     DECLARE v_enc_diag_id INT;
+    DECLARE batch_counter INT DEFAULT 0;
+    DECLARE batch_size INT DEFAULT 1000;
 
     -- Cursor to loop through encounters
     DECLARE cur_encounters CURSOR FOR
@@ -167,7 +196,7 @@ BEGIN
     INTO v_enc_diag_id
     FROM encounter_diagnoses;
 
-
+    START TRANSACTION;
     OPEN cur_encounters;
 
     encounter_loop: LOOP
@@ -201,7 +230,7 @@ BEGIN
                 -- Manually increment the primary key
                 SET v_enc_diag_id = v_enc_diag_id + 1;
 
-                INSERT INTO encounter_diagnoses (
+                INSERT INTO healthcare_oltp.encounter_diagnoses (
                     encounter_diagnosis_id,
                     encounter_id,
                     diagnosis_id,
@@ -216,36 +245,41 @@ BEGIN
             END IF;
 
             SET i = i + 1;
+            SET batch_counter = batch_counter + 1;
+
+            -- BATCH COMMIT
+            IF batch_counter = batch_size THEN
+                COMMIT;
+                START TRANSACTION;
+                SET batch_counter = 0;
+            END IF;
         END WHILE;
 
     END LOOP;
 
     CLOSE cur_encounters;
+    -- commit remaining rows
+    COMMIT;
 END$$
-
 DELIMITER ;
 
 CALL load_encounter_diagnoses();
 
--- ⚠️ Why are we exploding rows here? Because each encounter can have multiple diagnoses, and we are assigning 2-3 diagnoses per encounter, leading to a combinatorial increase in rows when joined with procedures later.
 
 
-
-
-INSERT INTO procedures VALUES 
+INSERT INTO healthcare_oltp.procedures VALUES 
 (4001, '99213', 'Office Visit'), 
 (4002, '93000', 'EKG'), 
 (4003, '71020', 'Chest X-ray');
 
 
-INSERT INTO encounter_procedures VALUES
+INSERT INTO healthcare_oltp.encounter_procedures VALUES
 (9001, 7001, 4001, '2024-05-10'),
 (9002, 7001, 4002, '2024-05-10'),
 (9003, 7002, 4001, '2024-06-02'),
 (9004, 7003, 4001, '2024-05-15');
 
 -- Insert ~1-2 per encounter procedures using a stored procedure
-
 DELIMITER $$
 
 CREATE PROCEDURE load_encounter_procedures()
@@ -257,11 +291,11 @@ BEGIN
     DECLARE i INT;
     DECLARE v_procedure_id INT;
     DECLARE v_enc_proc_id INT;
-
+    DECLARE batch_counter INT DEFAULT 0;
+    DECLARE batch_size INT DEFAULT 1000;
     -- Cursor
     DECLARE cur_encounters CURSOR FOR
         SELECT encounter_id FROM encounters;
-
     -- Handler
     DECLARE CONTINUE HANDLER FOR NOT FOUND SET done = 1;
 
@@ -270,6 +304,8 @@ BEGIN
     INTO v_enc_proc_id
     FROM encounter_procedures;
 
+
+    START TRANSACTION;
     OPEN cur_encounters;
 
     encounter_loop: LOOP
@@ -301,7 +337,7 @@ BEGIN
             ) THEN
                 SET v_enc_proc_id = v_enc_proc_id + 1;
 
-                INSERT INTO encounter_procedures (
+                INSERT INTO healthcare_oltp.encounter_procedures (
                     encounter_procedure_id,
                     encounter_id,
                     procedure_id,
@@ -316,11 +352,22 @@ BEGIN
             END IF;
 
             SET i = i + 1;
+
+            SET batch_counter = batch_counter + 1;
+
+            -- BATCH COMMIT
+            IF batch_counter = batch_size THEN
+                COMMIT;
+                START TRANSACTION;
+                SET batch_counter = 0;
+            END IF;
         END WHILE;
 
     END LOOP;
 
     CLOSE cur_encounters;
+    -- commit remaining rows
+    COMMIT;
 END$$
 
 DELIMITER ;
@@ -328,7 +375,8 @@ DELIMITER ;
 CALL load_encounter_procedures();
 
 
-INSERT INTO billing VALUES 
+
+INSERT INTO healthcare_oltp.billing VALUES 
 (14001, 7001, 350, 280, '2024-05-11', 'Paid'), 
 (14002, 7002, 12500, 10000, '2024-06-08', 'Paid');
 
@@ -340,6 +388,8 @@ BEGIN
     DECLARE done INT DEFAULT 0;
     DECLARE v_encounter_id INT;
     DECLARE v_billing_id INT;
+    DECLARE batch_counter INT DEFAULT 0;
+    DECLARE batch_size INT DEFAULT 1000;
 
     DECLARE cur_encounters CURSOR FOR
         SELECT encounter_id FROM encounters;
@@ -351,6 +401,7 @@ BEGIN
     INTO v_billing_id
     FROM billing;
 
+    START TRANSACTION;
     OPEN cur_encounters;
 
     read_loop: LOOP
@@ -366,7 +417,7 @@ BEGIN
         ) THEN
             SET v_billing_id = v_billing_id + 1;
 
-            INSERT INTO billing (
+            INSERT INTO healthcare_oltp.billing (
                 billing_id,
                 encounter_id,
                 claim_amount,
@@ -384,14 +435,23 @@ BEGIN
             );
         END IF;
 
+        SET batch_counter = batch_counter + 1;
+
+        -- BATCH COMMIT
+        IF batch_counter = batch_size THEN
+            COMMIT;
+            START TRANSACTION;
+            SET batch_counter = 0;
+        END IF;
+
     END LOOP;
 
     CLOSE cur_encounters;
+
+    -- commit remaining rows
+    COMMIT;
 END$$
 
 DELIMITER ;
 
-
 CALL load_billing_per_encounter();
-
-
