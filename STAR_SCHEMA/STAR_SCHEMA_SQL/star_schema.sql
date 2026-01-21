@@ -1,7 +1,23 @@
+<<<<<<< Updated upstream
+=======
+-- Active: 1766589376562@@127.0.0.1@3306@healthcare_star
+DROP DATABASE IF EXISTS healthcare_star;
+>>>>>>> Stashed changes
 CREATE DATABASE IF NOT EXISTS healthcare_star;
 /* =========================================================
    DIMENSION TABLES
    ========================================================= */
+
+CREATE TABLE healthcare_star.etl_run_log (
+    etl_run_id INT AUTO_INCREMENT PRIMARY KEY,
+    process_name VARCHAR(100),
+    start_time DATETIME,
+    end_time DATETIME,
+    status VARCHAR(20),
+    rows_affected INT,
+    error_message TEXT
+);
+
 
 /* ---------------------------------------------------------
    dim_date
@@ -152,12 +168,17 @@ CREATE TABLE healthcare_star.fact_encounters (
     total_allowed_amount DECIMAL(12,2),
     length_of_stay INT,
     encounter_id INT,
+<<<<<<< Updated upstream
+=======
+
+>>>>>>> Stashed changes
     FOREIGN KEY (date_key) REFERENCES healthcare_star.dim_date(date_key),
     FOREIGN KEY (patient_key) REFERENCES healthcare_star.dim_patient(patient_key),
     FOREIGN KEY (provider_key) REFERENCES healthcare_star.dim_provider(provider_key),
     FOREIGN KEY (specialty_key) REFERENCES healthcare_star.dim_specialty(specialty_key),
     FOREIGN KEY (department_key) REFERENCES healthcare_star.dim_department(department_key),
     FOREIGN KEY (encounter_type_key) REFERENCES healthcare_star.dim_encounter_type(encounter_type_key),
+
     INDEX idx_date_key (date_key),
     INDEX idx_patient_key (patient_key),
     INDEX idx_provider_key (provider_key),
@@ -166,6 +187,10 @@ CREATE TABLE healthcare_star.fact_encounters (
     INDEX idx_encounter_type_key (encounter_type_key)
 );
 
+<<<<<<< Updated upstream
+=======
+
+>>>>>>> Stashed changes
 
 
 /* =========================================================
