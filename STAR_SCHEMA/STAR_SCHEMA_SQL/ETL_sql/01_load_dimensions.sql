@@ -226,4 +226,3 @@ DELIMITER ;
 
 CALL healthcare_star.sp_load_dimensions();
 
-select * FROM healthcare_star.etl_run_log;

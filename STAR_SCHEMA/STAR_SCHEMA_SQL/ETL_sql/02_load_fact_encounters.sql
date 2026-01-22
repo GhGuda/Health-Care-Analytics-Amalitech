@@ -124,3 +124,4 @@ END$$
 
 DELIMITER;
 
+CALL healthcare_star.sp_load_fact_encounters();
