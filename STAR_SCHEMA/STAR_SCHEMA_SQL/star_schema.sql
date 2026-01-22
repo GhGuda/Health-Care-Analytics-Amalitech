@@ -1,8 +1,17 @@
-CREATE DATABASE IF NOT EXISTS healthcare_star;
 /* =========================================================
-   DIMENSION TABLES
+   DATABASE: healthcare_star
+   PURPOSE : Analytical (OLAP) database designed using a
+             STAR SCHEMA for reporting and business intelligence.
+             This schema is populated via ETL from healthcare_oltp
+             and is treated as READ-ONLY for end users.
    ========================================================= */
 
+
+DROP DATABASE IF EXISTS healthcare_star;
+CREATE DATABASE IF NOT EXISTS healthcare_star;
+
+
+/* Stores ETL execution metadata for monitoring and auditing */
 CREATE TABLE healthcare_star.etl_run_log (
     etl_run_id INT AUTO_INCREMENT PRIMARY KEY,
     process_name VARCHAR(100),
@@ -14,14 +23,10 @@ CREATE TABLE healthcare_star.etl_run_log (
 );
 
 
-/* ---------------------------------------------------------
-   dim_date
-   Purpose: Provides calendar attributes for time-based analysis
-   --------------------------------------------------------- */
-   
--- 1. Date Dimension
+
+/* Calendar dimension for all time-based analytics */
 CREATE TABLE healthcare_star.dim_date (
-    date_key INT PRIMARY KEY,
+    date_key INT PRIMARY KEY,        /* Surrogate date key (YYYYMMDD) */
     calendar_date DATE NOT NULL,
     day INT,
     month INT,
@@ -32,15 +37,12 @@ CREATE TABLE healthcare_star.dim_date (
 );
 
 
-/* ---------------------------------------------------------
-   dim_patient
-   Purpose: Stores descriptive patient attributes
-   --------------------------------------------------------- */
 
--- 2. Patient Dimension
+
+/* Patient descriptive attributes for demographic analysis */
 CREATE TABLE healthcare_star.dim_patient (
     patient_key INT AUTO_INCREMENT PRIMARY KEY,
-    patient_id INT,
+    patient_id INT,                 /* Business key from OLTP */
     mrn VARCHAR(20),
     first_name VARCHAR(100),
     last_name VARCHAR(100),
@@ -50,12 +52,10 @@ CREATE TABLE healthcare_star.dim_patient (
 );
 
 
-/* ---------------------------------------------------------
-   dim_specialty
-   Purpose: Stores medical specialty information
-   --------------------------------------------------------- */
 
--- 3. Speciality Dimension
+
+
+/* Medical specialty reference dimension */
 CREATE TABLE healthcare_star.dim_specialty (
     specialty_key INT AUTO_INCREMENT PRIMARY KEY,
     specialty_id INT,
@@ -64,12 +64,9 @@ CREATE TABLE healthcare_star.dim_specialty (
 );
 
 
-/* ---------------------------------------------------------
-   dim_department
-   Purpose: Describes hospital departments where care occurs
-   --------------------------------------------------------- */
 
--- 4. Department Dimension
+
+/* Hospital department reference dimension */
 CREATE TABLE healthcare_star.dim_department (
     department_key INT AUTO_INCREMENT PRIMARY KEY,
     department_id INT,
@@ -79,12 +76,9 @@ CREATE TABLE healthcare_star.dim_department (
 );
 
 
-/* ---------------------------------------------------------
-   dim_provider
-   Purpose: Stores healthcare provider details
-   --------------------------------------------------------- */
 
--- 5. Providers Dimension
+
+/* Healthcare provider dimension linked to specialty and department */
 CREATE TABLE healthcare_star.dim_provider (
     provider_key INT AUTO_INCREMENT PRIMARY KEY,
     provider_id INT,
@@ -93,29 +87,33 @@ CREATE TABLE healthcare_star.dim_provider (
     credential VARCHAR(20),
     specialty_key INT,
     department_key INT,
-    FOREIGN KEY (specialty_key) REFERENCES healthcare_star.dim_specialty(specialty_key),
-    FOREIGN KEY (department_key) REFERENCES healthcare_star.dim_department(department_key)
+
+    CONSTRAINT fk_dim_provider_specialty
+      FOREIGN KEY (specialty_key)
+        REFERENCES healthcare_star.dim_specialty(specialty_key)
+        ON DELETE RESTRICT
+        ON UPDATE CASCADE /* Preserve specialty history */,
+
+    CONSTRAINT fk_dim_provider_department
+      FOREIGN KEY (department_key)
+        REFERENCES healthcare_star.dim_department(department_key)
+        ON DELETE RESTRICT
+        ON UPDATE CASCADE /* Preserve department history */
 );
 
 
-/* ---------------------------------------------------------
-   dim_encounter_type
-   Purpose: Standardizes encounter types (ER, Inpatient, Outpatient)
-   --------------------------------------------------------- */
 
--- 6. Encounter Type Dimension
+
+/* Standardized encounter type dimension */
 CREATE TABLE healthcare_star.dim_encounter_type (
     encounter_type_key INT AUTO_INCREMENT PRIMARY KEY,
     encounter_type_name VARCHAR(50)
 );
 
 
-/* ---------------------------------------------------------
-   dim_diagnosis
-   Purpose: Stores diagnosis codes and descriptions
-   --------------------------------------------------------- */
 
--- 7. Diagnosis Dimension
+
+/* ICD-10 diagnosis reference dimension */
 CREATE TABLE healthcare_star.dim_diagnosis (
     diagnosis_key INT AUTO_INCREMENT PRIMARY KEY,
     diagnosis_id INT,
@@ -123,12 +121,10 @@ CREATE TABLE healthcare_star.dim_diagnosis (
     icd10_description VARCHAR(200)
 );
 
-/* ---------------------------------------------------------
-   dim_procedure
-   Purpose: Stores procedure codes and descriptions
-   --------------------------------------------------------- */
 
--- 8. Procedure Dimension
+
+
+/* CPT procedure reference dimension */
 CREATE TABLE healthcare_star.dim_procedure (
     procedure_key INT AUTO_INCREMENT PRIMARY KEY,
     procedure_id INT,
@@ -139,16 +135,7 @@ CREATE TABLE healthcare_star.dim_procedure (
 
 
 
-/* =========================================================
-   FACT TABLE
-   ========================================================= */
-
-/* ---------------------------------------------------------
-   fact_encounters
-   Purpose: Central fact table with one row per encounter
-   --------------------------------------------------------- */
-
--- DDL: Fact Table
+/* Central fact table: one row per encounter */
 CREATE TABLE healthcare_star.fact_encounters (
     encounter_key INT AUTO_INCREMENT PRIMARY KEY,
     date_key INT NOT NULL,
@@ -162,13 +149,43 @@ CREATE TABLE healthcare_star.fact_encounters (
     procedure_count INT,
     total_allowed_amount DECIMAL(12,2),
     length_of_stay INT,
-    encounter_id INT,
-    FOREIGN KEY (date_key) REFERENCES healthcare_star.dim_date(date_key),
-    FOREIGN KEY (patient_key) REFERENCES healthcare_star.dim_patient(patient_key),
-    FOREIGN KEY (provider_key) REFERENCES healthcare_star.dim_provider(provider_key),
-    FOREIGN KEY (specialty_key) REFERENCES healthcare_star.dim_specialty(specialty_key),
-    FOREIGN KEY (department_key) REFERENCES healthcare_star.dim_department(department_key),
-    FOREIGN KEY (encounter_type_key) REFERENCES healthcare_star.dim_encounter_type(encounter_type_key),
+    encounter_id INT,               /* Degenerate dimension */
+
+    CONSTRAINT fk_fact_date
+      FOREIGN KEY (date_key)
+        REFERENCES healthcare_star.dim_date(date_key)
+        ON DELETE RESTRICT
+        ON UPDATE CASCADE /* Protect fact history */,
+
+    CONSTRAINT fk_fact_patient
+      FOREIGN KEY (patient_key)
+        REFERENCES healthcare_star.dim_patient(patient_key)
+        ON DELETE RESTRICT
+        ON UPDATE CASCADE,
+
+    CONSTRAINT fk_fact_provider
+      FOREIGN KEY (provider_key)
+        REFERENCES healthcare_star.dim_provider(provider_key)
+        ON DELETE RESTRICT
+        ON UPDATE CASCADE,
+
+    CONSTRAINT fk_fact_specialty
+      FOREIGN KEY (specialty_key)
+        REFERENCES healthcare_star.dim_specialty(specialty_key)
+        ON DELETE RESTRICT
+        ON UPDATE CASCADE,
+
+    CONSTRAINT fk_fact_department
+      FOREIGN KEY (department_key)
+        REFERENCES healthcare_star.dim_department(department_key)
+        ON DELETE RESTRICT
+        ON UPDATE CASCADE,
+
+    CONSTRAINT fk_fact_encounter_type
+      FOREIGN KEY (encounter_type_key)
+        REFERENCES healthcare_star.dim_encounter_type(encounter_type_key)
+        ON DELETE RESTRICT
+        ON UPDATE CASCADE,
 
     INDEX idx_date_key (date_key),
     INDEX idx_patient_key (patient_key),
@@ -178,60 +195,54 @@ CREATE TABLE healthcare_star.fact_encounters (
     INDEX idx_encounter_type_key (encounter_type_key)
 );
 
-ALTER TABLE healthcare_star.fact_encounters DROP COLUMN encounter_date;
-ALTER TABLE healthcare_star.fact_encounters DROP COLUMN discharge_date;
 
 
-<<<<<<< Updated upstream
-=======
-
->>>>>>> Stashed changes
 
 
-/* =========================================================
-   BRIDGE TABLES (MANY-TO-MANY RELATIONSHIPS)
-   ========================================================= */
-
-/* ---------------------------------------------------------
-   bridge_encounter_diagnoses
-   Purpose: Resolves many-to-many relationship between
-            encounters and diagnoses
-   --------------------------------------------------------- */
-
--- DDL: bridge_encounter_diagnoses
+/* Resolves many-to-many relationship between encounters and diagnoses */
 CREATE TABLE healthcare_star.bridge_encounter_diagnoses (
     encounter_key INT NOT NULL,
     diagnosis_key INT NOT NULL,
     diagnosis_sequence INT,
     PRIMARY KEY (encounter_key, diagnosis_key, diagnosis_sequence),
-    FOREIGN KEY (encounter_key) REFERENCES healthcare_star.fact_encounters(encounter_key),
-    FOREIGN KEY (diagnosis_key) REFERENCES healthcare_star.dim_diagnosis(diagnosis_key),
-    INDEX idx_bed_encounter (encounter_key),
-    INDEX idx_bed_diagnosis (diagnosis_key)
+
+    CONSTRAINT fk_bed_fact
+      FOREIGN KEY (encounter_key)
+        REFERENCES healthcare_star.fact_encounters(encounter_key)
+        ON DELETE CASCADE
+        ON UPDATE CASCADE /* Remove bridge rows with fact */,
+
+    CONSTRAINT fk_bed_diagnosis
+      FOREIGN KEY (diagnosis_key)
+        REFERENCES healthcare_star.dim_diagnosis(diagnosis_key)
+        ON DELETE RESTRICT
+        ON UPDATE CASCADE /* Preserve diagnosis history */
 );
 
 
 
-/* ---------------------------------------------------------
-   bridge_encounter_procedures
-   Purpose: Resolves many-to-many relationship between
-            encounters and procedures
-   --------------------------------------------------------- */
--- DDL: bridge_encounter_procedures
+
+/* Resolves many-to-many relationship between encounters and procedures */
 CREATE TABLE healthcare_star.bridge_encounter_procedures (
     encounter_key INT NOT NULL,
     procedure_key INT NOT NULL,
     procedure_date DATE,
     PRIMARY KEY (encounter_key, procedure_key),
-    FOREIGN KEY (encounter_key) REFERENCES healthcare_star.fact_encounters(encounter_key),
-    FOREIGN KEY (procedure_key) REFERENCES healthcare_star.dim_procedure(procedure_key),
-    INDEX idx_bep_encounter (encounter_key),
-    INDEX idx_bep_procedure (procedure_key)
+
+    CONSTRAINT fk_bep_fact
+      FOREIGN KEY (encounter_key)
+        REFERENCES healthcare_star.fact_encounters(encounter_key)
+        ON DELETE CASCADE
+        ON UPDATE CASCADE /* Cascade with fact */,
+
+    CONSTRAINT fk_bep_procedure
+      FOREIGN KEY (procedure_key)
+        REFERENCES healthcare_star.dim_procedure(procedure_key)
+        ON DELETE RESTRICT /* Protect procedure dimension */
 );
+
+
 
 /* =========================================================
    END OF STAR SCHEMA DEFINITION
    ========================================================= */
-
-
-SHOW TABLES FROM healthcare_star;   

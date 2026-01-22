@@ -99,6 +99,4 @@ END$$
 
 DELIMITER ;
 
-DELETE * FROM 
-
 CALL healthcare_star.sp_load_bridge_tables();

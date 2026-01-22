@@ -1,5 +1,4 @@
--- Active: 1768089040947@@127.0.0.1@3306@healthcare_oltp
-
+-- Active: 1769026978494@@127.0.0.1@3306@healthcare_oltp
   
 INSERT INTO healthcare_oltp.patients VALUES 
 (1001, 'John', 'Doe','1955-03-15', 'M', 'MRN001'),
@@ -8,17 +7,28 @@ INSERT INTO healthcare_oltp.patients VALUES
 
 -- Insert ~5,000 patients using a stored procedure
 DELIMITER $$
+
 CREATE PROCEDURE load_patients_5k()
 BEGIN
     DECLARE i INT DEFAULT 1;
     DECLARE next_patient_id INT;
     DECLARE batch_counter INT DEFAULT 0;
     DECLARE batch_size INT DEFAULT 1000;
+    DECLARE rows_loaded INT DEFAULT 0;
 
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        ROLLBACK;
+        INSERT INTO healthcare_star.etl_run_log
+        (process_name, start_time, end_time, status, rows_affected, error_message)
+        VALUES ('load_patients_5k', NOW(), NOW(), 'FAILED', rows_loaded, 'Error loading patients');
+    END;
 
     SELECT IFNULL(MAX(patient_id), 1000)
     INTO next_patient_id
     FROM patients;
+
+    START TRANSACTION;
 
     WHILE i <= 4997 DO
         SET next_patient_id = next_patient_id + 1;
@@ -41,21 +51,28 @@ BEGIN
         );
 
         SET i = i + 1;
+        SET rows_loaded = rows_loaded + 1;
         SET batch_counter = batch_counter + 1;
-        -- BATCH COMMIT
+
         IF batch_counter = batch_size THEN
             COMMIT;
             START TRANSACTION;
             SET batch_counter = 0;
         END IF;
     END WHILE;
-    -- commit remaining rows
+
     COMMIT;
+
+    INSERT INTO healthcare_star.etl_run_log
+    (process_name, start_time, end_time, status, rows_affected)
+    VALUES ('load_patients_5k', NOW(), NOW(), 'SUCCESS', rows_loaded);
 END$$
 
 DELIMITER ;
 
+
 CALL load_patients_5k();
+
 
 
 INSERT INTO healthcare_oltp.specialties VALUES 
@@ -89,6 +106,15 @@ BEGIN
     DECLARE next_encounter_id INT;
     DECLARE batch_counter INT DEFAULT 0;
     DECLARE batch_size INT DEFAULT 1000;
+    DECLARE rows_loaded INT DEFAULT 0;
+
+
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        ROLLBACK;
+        INSERT INTO healthcare_star.etl_run_log
+        VALUES (NULL, 'load_encounters_100k', NOW(), NOW(), 'FAILED', rows_loaded, 'Encounter load failed');
+    END;
 
     -- get the current max encounter_id
     SELECT MAX(encounter_id) INTO next_encounter_id FROM encounters;
@@ -138,6 +164,7 @@ BEGIN
         SET next_encounter_id = next_encounter_id + 1;
         SET i = i + 1;
         SET batch_counter = batch_counter + 1;
+        SET rows_loaded = rows_loaded + 1;
 
         -- BATCH COMMIT
         IF batch_counter = batch_size THEN
@@ -149,10 +176,17 @@ BEGIN
     END WHILE;
     -- commit remaining rows
     COMMIT;
+
+    INSERT INTO healthcare_star.etl_run_log
+    VALUES (NULL, 'load_encounters_100k', NOW(), NOW(), 'SUCCESS', rows_loaded, NULL);
+
 END$$
 DELIMITER ;
 
 CALL load_encounters_100k();
+
+SELECT count(*) from encounters;
+
 
 
 
@@ -184,11 +218,23 @@ BEGIN
     DECLARE batch_counter INT DEFAULT 0;
     DECLARE batch_size INT DEFAULT 1000;
 
+    DECLARE rows_loaded INT DEFAULT 0;
+
+
     -- Cursor to loop through encounters
     DECLARE cur_encounters CURSOR FOR
         SELECT encounter_id FROM encounters;
 
     DECLARE CONTINUE HANDLER FOR NOT FOUND SET done = 1;
+
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+
+    BEGIN
+        ROLLBACK;
+        INSERT INTO healthcare_star.etl_run_log
+        VALUES (NULL, 'load_encounter_diagnoses', NOW(), NOW(), 'FAILED', rows_loaded, 'Diagnosis load failed');
+    END;
+
 
 
     -- Get the current max encounter_diagnosis_id
@@ -246,6 +292,8 @@ BEGIN
 
             SET i = i + 1;
             SET batch_counter = batch_counter + 1;
+            SET rows_loaded = rows_loaded + 1;
+
 
             -- BATCH COMMIT
             IF batch_counter = batch_size THEN
@@ -260,6 +308,10 @@ BEGIN
     CLOSE cur_encounters;
     -- commit remaining rows
     COMMIT;
+
+    INSERT INTO healthcare_star.etl_run_log
+    VALUES (NULL, 'load_encounter_diagnoses', NOW(), NOW(), 'SUCCESS', rows_loaded, NULL);
+
 END$$
 DELIMITER ;
 
@@ -293,11 +345,22 @@ BEGIN
     DECLARE v_enc_proc_id INT;
     DECLARE batch_counter INT DEFAULT 0;
     DECLARE batch_size INT DEFAULT 1000;
+
+    DECLARE rows_loaded INT DEFAULT 0;
     -- Cursor
     DECLARE cur_encounters CURSOR FOR
         SELECT encounter_id FROM encounters;
     -- Handler
     DECLARE CONTINUE HANDLER FOR NOT FOUND SET done = 1;
+
+
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        ROLLBACK;
+        INSERT INTO healthcare_star.etl_run_log
+        VALUES (NULL, 'load_encounter_procedures', NOW(), NOW(), 'FAILED', rows_loaded, 'Procedure load failed');
+    END;
+
 
     -- Get current max encounter_procedure_id
     SELECT COALESCE(MAX(encounter_procedure_id), 0)
@@ -354,6 +417,7 @@ BEGIN
             SET i = i + 1;
 
             SET batch_counter = batch_counter + 1;
+            SET rows_loaded = rows_loaded + 1;
 
             -- BATCH COMMIT
             IF batch_counter = batch_size THEN
@@ -368,11 +432,15 @@ BEGIN
     CLOSE cur_encounters;
     -- commit remaining rows
     COMMIT;
+
+    INSERT INTO healthcare_star.etl_run_log
+    VALUES (NULL, 'load_encounter_procedures', NOW(), NOW(), 'SUCCESS', rows_loaded, NULL);
 END$$
 
 DELIMITER ;
 
 CALL load_encounter_procedures();
+
 
 
 
@@ -390,11 +458,20 @@ BEGIN
     DECLARE v_billing_id INT;
     DECLARE batch_counter INT DEFAULT 0;
     DECLARE batch_size INT DEFAULT 1000;
+    DECLARE rows_loaded INT DEFAULT 0;
 
     DECLARE cur_encounters CURSOR FOR
         SELECT encounter_id FROM encounters;
 
     DECLARE CONTINUE HANDLER FOR NOT FOUND SET done = 1;
+
+
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        ROLLBACK;
+        INSERT INTO healthcare_star.etl_run_log
+        VALUES (NULL, 'load_billing_per_encounter', NOW(), NOW(), 'FAILED', rows_loaded, 'Billing load failed');
+    END;
 
     -- Get current max billing_id
     SELECT COALESCE(MAX(billing_id), 14000)
@@ -436,6 +513,7 @@ BEGIN
         END IF;
 
         SET batch_counter = batch_counter + 1;
+        SET rows_loaded = rows_loaded + 1;
 
         -- BATCH COMMIT
         IF batch_counter = batch_size THEN
@@ -450,6 +528,9 @@ BEGIN
 
     -- commit remaining rows
     COMMIT;
+
+    INSERT INTO healthcare_star.etl_run_log
+    VALUES (NULL, 'load_billing_per_encounter', NOW(), NOW(), 'SUCCESS', rows_loaded, NULL);
 END$$
 
 DELIMITER ;
